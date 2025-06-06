@@ -4,18 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	"sourcecraft-actions/pkg/serviceaccount"
-
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/serverless/functions/v1"
-	"github.com/yandex-cloud/go-sdk"
+	ycsdk "github.com/yandex-cloud/go-sdk"
+	"github.com/yc-actions/sourcecraft-actions/pkg/serviceaccount"
 )
 
-// IsAsync checks if async invocation is enabled
+// IsAsync checks if async invocation is enabled.
 func IsAsync(inputs *ActionInputs) bool {
 	return inputs.Async
 }
 
-// ValidateAsync validates the async invocation configuration
+// ValidateAsync validates the async invocation configuration.
 func ValidateAsync(inputs *ActionInputs) error {
 	if !IsAsync(inputs) {
 		return nil
@@ -24,39 +23,48 @@ func ValidateAsync(inputs *ActionInputs) error {
 	// Either AsyncSuccessSaID or AsyncSuccessSaName must be set if AsyncSuccessYmqArn is set
 	if inputs.AsyncSuccessYmqArn != "" {
 		if inputs.AsyncSuccessSaID == "" && inputs.AsyncSuccessSaName == "" {
-			return fmt.Errorf("either AsyncSuccessSaID or AsyncSuccessSaName must be set if AsyncSuccessYmqArn is set")
+			return fmt.Errorf(
+				"either AsyncSuccessSaID or AsyncSuccessSaName must be set if AsyncSuccessYmqArn is set",
+			)
 		}
 		// But not both
 		if inputs.AsyncSuccessSaID != "" && inputs.AsyncSuccessSaName != "" {
-			return fmt.Errorf("either AsyncSuccessSaID or AsyncSuccessSaName must be set, but not both")
+			return fmt.Errorf(
+				"either AsyncSuccessSaID or AsyncSuccessSaName must be set, but not both",
+			)
 		}
 	}
 
 	// Either AsyncFailureSaID or AsyncFailureSaName must be set if AsyncFailureYmqArn is set
 	if inputs.AsyncFailureYmqArn != "" {
 		if inputs.AsyncFailureSaID == "" && inputs.AsyncFailureSaName == "" {
-			return fmt.Errorf("either AsyncFailureSaID or AsyncFailureSaName must be set if AsyncFailureYmqArn is set")
+			return fmt.Errorf(
+				"either AsyncFailureSaID or AsyncFailureSaName must be set if AsyncFailureYmqArn is set",
+			)
 		}
 		// But not both
 		if inputs.AsyncFailureSaID != "" && inputs.AsyncFailureSaName != "" {
-			return fmt.Errorf("either AsyncFailureSaID or AsyncFailureSaName must be set, but not both")
+			return fmt.Errorf(
+				"either AsyncFailureSaID or AsyncFailureSaName must be set, but not both",
+			)
 		}
 	}
 
 	return nil
 }
 
-// CreateAsyncInvocationConfig creates an async invocation configuration
-func CreateAsyncInvocationConfig(ctx context.Context, sdk *ycsdk.SDK, inputs *ActionInputs) (*functions.AsyncInvocationConfig, error) {
-	if !IsAsync(inputs) {
-		return nil, nil
-	}
-
+// CreateAsyncInvocationConfig creates an async invocation configuration.
+func CreateAsyncInvocationConfig(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	inputs *ActionInputs,
+) (*functions.AsyncInvocationConfig, error) {
 	var successTarget *functions.AsyncInvocationConfig_ResponseTarget
+
 	var failureTarget *functions.AsyncInvocationConfig_ResponseTarget
 
 	if inputs.AsyncSuccessYmqArn != "" {
-		serviceAccountID, err := serviceaccount.ResolveServiceAccountID(
+		serviceAccountID, err := serviceaccount.ResolveID(
 			ctx,
 			sdk,
 			inputs.FolderID,
@@ -84,7 +92,7 @@ func CreateAsyncInvocationConfig(ctx context.Context, sdk *ycsdk.SDK, inputs *Ac
 	}
 
 	if inputs.AsyncFailureYmqArn != "" {
-		serviceAccountID, err := serviceaccount.ResolveServiceAccountID(
+		serviceAccountID, err := serviceaccount.ResolveID(
 			ctx,
 			sdk,
 			inputs.FolderID,
@@ -112,7 +120,7 @@ func CreateAsyncInvocationConfig(ctx context.Context, sdk *ycsdk.SDK, inputs *Ac
 	}
 
 	// Resolve service account ID for async invocation
-	serviceAccountID, err := serviceaccount.ResolveServiceAccountID(
+	serviceAccountID, err := serviceaccount.ResolveID(
 		ctx,
 		sdk,
 		inputs.FolderID,
@@ -125,7 +133,7 @@ func CreateAsyncInvocationConfig(ctx context.Context, sdk *ycsdk.SDK, inputs *Ac
 
 	// If no specific async service account is provided, use the function's service account
 	if serviceAccountID == "" {
-		serviceAccountID, err = serviceaccount.ResolveServiceAccountID(
+		serviceAccountID, err = serviceaccount.ResolveID(
 			ctx,
 			sdk,
 			inputs.FolderID,

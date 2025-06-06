@@ -1,0 +1,18 @@
+all: false
+dir: '{{.InterfaceDir}}'
+filename: mock_{{.InterfaceName}}.go
+force-file-write: true
+formatter: goimports
+log-level: info
+structname: 'Mock{{.InterfaceName}}'
+pkgname: mocks
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/yc-actions/sourcecraft-actions/pkg/storage:
+    interfaces:
+      StorageService:
+        config:
+          dir: pkg/storage/mocks

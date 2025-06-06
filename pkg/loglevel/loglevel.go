@@ -9,7 +9,7 @@ import (
 
 var logLevelValues = []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 
-// ParseLogLevel parses a log level string into the corresponding enum value
+// ParseLogLevel parses a log level string into the corresponding enum value.
 func ParseLogLevel(levelKey string) (logging.LogLevel_Level, error) {
 	if levelKey == "" {
 		return logging.LogLevel_LEVEL_UNSPECIFIED, nil
@@ -19,9 +19,11 @@ func ParseLogLevel(levelKey string) (logging.LogLevel_Level, error) {
 
 	// Check if the level is valid
 	isValid := false
+
 	for _, level := range logLevelValues {
 		if level == upperLevelKey {
 			isValid = true
+
 			break
 		}
 	}

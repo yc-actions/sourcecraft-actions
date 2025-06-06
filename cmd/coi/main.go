@@ -8,22 +8,21 @@ import (
 	"strconv"
 	"strings"
 
-	"sourcecraft-actions/pkg/memory"
-	"sourcecraft-actions/pkg/serviceaccount"
-	"sourcecraft-actions/pkg/sourcecraft"
-
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/compute/v1"
-	"github.com/yandex-cloud/go-sdk"
+	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
+	"github.com/yc-actions/sourcecraft-actions/pkg/memory"
+	"github.com/yc-actions/sourcecraft-actions/pkg/serviceaccount"
+	"github.com/yc-actions/sourcecraft-actions/pkg/sourcecraft"
 )
 
-// Constants for metadata keys
+// Constants for metadata keys.
 const (
 	DockerContainerDeclarationKey = "docker-container-declaration"
 	DockerComposeKey              = "docker-compose"
 )
 
-// Action inputs
+// Action inputs.
 const (
 	inputFolderID             = "FOLDER_ID"
 	inputUserDataPath         = "USER_DATA_PATH"
@@ -47,7 +46,7 @@ const (
 
 // No local environment variable constants needed as they are defined in pkg/sourcecraft/sdk.go
 
-// VMParams represents the parameters for a VM
+// VMParams represents the parameters for a VM.
 type VMParams struct {
 	UserDataPath       string
 	DockerComposePath  string
@@ -64,7 +63,7 @@ type VMParams struct {
 	ResourcesSpec      *compute.ResourcesSpec
 }
 
-// findCoiImageID finds the latest Container Optimized Image ID
+// findCoiImageID finds the latest Container Optimized Image ID.
 func findCoiImageID(ctx context.Context, sdk *ycsdk.SDK) (string, error) {
 	sourcecraft.StartGroup("Find COI image id")
 	defer sourcecraft.EndGroup()
@@ -75,21 +74,24 @@ func findCoiImageID(ctx context.Context, sdk *ycsdk.SDK) (string, error) {
 	}
 
 	imageService := sdk.Compute().Image()
+
 	image, err := imageService.GetLatestByFamily(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest COI image: %w", err)
 	}
 
 	sourcecraft.Info(fmt.Sprintf("COI image id: %s", image.Id))
+
 	return image.Id, nil
 }
 
-// findVM finds a VM by name
+// findVM finds a VM by name.
 func findVM(ctx context.Context, sdk *ycsdk.SDK, folderID, name string) (string, error) {
 	sourcecraft.StartGroup("Find VM by name")
 	defer sourcecraft.EndGroup()
 
 	instanceService := sdk.Compute().Instance()
+
 	resp, err := instanceService.List(ctx, &compute.ListInstancesRequest{
 		FolderId: folderID,
 		Filter:   fmt.Sprintf("name = '%s'", name),
@@ -101,10 +103,11 @@ func findVM(ctx context.Context, sdk *ycsdk.SDK, folderID, name string) (string,
 	if len(resp.Instances) > 0 {
 		return resp.Instances[0].Id, nil
 	}
+
 	return "", nil
 }
 
-// prepareConfig prepares a configuration file by rendering templates
+// prepareConfig prepares a configuration file by rendering templates.
 func prepareConfig(filePath string) (string, error) {
 	workspace := sourcecraft.GetSourcecraftWorkspace()
 
@@ -117,6 +120,7 @@ func prepareConfig(filePath string) (string, error) {
 	// Simple template replacement for environment variables
 	// This is a basic implementation; a more sophisticated template engine might be needed
 	result := string(content)
+
 	for _, envVar := range os.Environ() {
 		parts := strings.SplitN(envVar, "=", 2)
 		if len(parts) == 2 {
@@ -129,21 +133,31 @@ func prepareConfig(filePath string) (string, error) {
 	return result, nil
 }
 
-// setOutputs sets the outputs for the Sourcecraft Action
+// setOutputs sets the outputs for the Sourcecraft Action.
 func setOutputs(instance *compute.Instance) {
 	sourcecraft.SetOutput("instance-id", instance.Id)
+
 	if instance.BootDisk != nil {
 		sourcecraft.SetOutput("disk-id", instance.BootDisk.DiskId)
 	}
 
-	if len(instance.NetworkInterfaces) > 0 && instance.NetworkInterfaces[0].PrimaryV4Address != nil &&
+	if len(instance.NetworkInterfaces) > 0 &&
+		instance.NetworkInterfaces[0].PrimaryV4Address != nil &&
 		instance.NetworkInterfaces[0].PrimaryV4Address.OneToOneNat != nil {
-		sourcecraft.SetOutput("public-ip", instance.NetworkInterfaces[0].PrimaryV4Address.OneToOneNat.Address)
+		sourcecraft.SetOutput(
+			"public-ip",
+			instance.NetworkInterfaces[0].PrimaryV4Address.OneToOneNat.Address,
+		)
 	}
 }
 
-// createVM creates a new VM
-func createVM(ctx context.Context, sdk *ycsdk.SDK, vmParams *VMParams, repoOwner, repoName string) error {
+// createVM creates a new VM.
+func createVM(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	vmParams *VMParams,
+	repoOwner, repoName string,
+) error {
 	coiImageID, err := findCoiImageID(ctx, sdk)
 	if err != nil {
 		return err
@@ -213,6 +227,7 @@ func createVM(ctx context.Context, sdk *ycsdk.SDK, vmParams *VMParams, repoOwner
 	}
 
 	instanceService := sdk.Compute().Instance()
+
 	op, err := instanceService.Create(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create instance: %w", err)
@@ -241,8 +256,13 @@ func createVM(ctx context.Context, sdk *ycsdk.SDK, vmParams *VMParams, repoOwner
 	return nil
 }
 
-// updateMetadata updates the metadata of an existing VM
-func updateMetadata(ctx context.Context, sdk *ycsdk.SDK, instanceID string, vmParams *VMParams) error {
+// updateMetadata updates the metadata of an existing VM.
+func updateMetadata(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	instanceID string,
+	vmParams *VMParams,
+) error {
 	sourcecraft.StartGroup("Update metadata")
 	defer sourcecraft.EndGroup()
 
@@ -271,6 +291,7 @@ func updateMetadata(ctx context.Context, sdk *ycsdk.SDK, instanceID string, vmPa
 	}
 
 	instanceService := sdk.Compute().Instance()
+
 	op, err := instanceService.UpdateMetadata(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to update instance metadata: %w", err)
@@ -296,7 +317,7 @@ func updateMetadata(ctx context.Context, sdk *ycsdk.SDK, instanceID string, vmPa
 	return nil
 }
 
-// parseVMInputs parses the VM inputs from environment variables
+// parseVMInputs parses the VM inputs from environment variables.
 func parseVMInputs() (*VMParams, error) {
 	sourcecraft.StartGroup("Parsing Action Inputs")
 	defer sourcecraft.EndGroup()
@@ -325,7 +346,9 @@ func parseVMInputs() (*VMParams, error) {
 	serviceAccountName := sourcecraft.GetInput(inputVMServiceAccountName)
 
 	if serviceAccountID == "" && serviceAccountName == "" {
-		return nil, fmt.Errorf("either vm-service-account-id or vm-service-account-name should be provided")
+		return nil, fmt.Errorf(
+			"either vm-service-account-id or vm-service-account-name should be provided",
+		)
 	}
 
 	zoneID := sourcecraft.GetInput(inputVMZoneID)
@@ -349,6 +372,7 @@ func parseVMInputs() (*VMParams, error) {
 	if coresStr == "" {
 		coresStr = "2"
 	}
+
 	cores, err := strconv.ParseInt(coresStr, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse vm-cores: %w", err)
@@ -358,6 +382,7 @@ func parseVMInputs() (*VMParams, error) {
 	if memoryStr == "" {
 		memoryStr = "2Gb"
 	}
+
 	memoryValue, err := memory.ParseMemory(memoryStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse vm-memory: %w", err)
@@ -372,6 +397,7 @@ func parseVMInputs() (*VMParams, error) {
 	if diskSizeStr == "" {
 		diskSizeStr = "30Gb"
 	}
+
 	diskSize, err := memory.ParseMemory(diskSizeStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse vm-disk-size: %w", err)
@@ -381,6 +407,7 @@ func parseVMInputs() (*VMParams, error) {
 	if coreFractionStr == "" {
 		coreFractionStr = "100"
 	}
+
 	coreFraction, err := strconv.ParseInt(coreFractionStr, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse vm-core-fraction: %w", err)
@@ -407,12 +434,13 @@ func parseVMInputs() (*VMParams, error) {
 	}, nil
 }
 
-// detectMetadataConflict checks if there's a metadata conflict
+// detectMetadataConflict checks if there's a metadata conflict.
 func detectMetadataConflict(ctx context.Context, sdk *ycsdk.SDK, instanceID string) error {
 	sourcecraft.StartGroup("Check metadata")
 	defer sourcecraft.EndGroup()
 
 	instanceService := sdk.Compute().Instance()
+
 	instance, err := instanceService.Get(ctx, &compute.GetInstanceRequest{
 		InstanceId: instanceID,
 		View:       compute.InstanceView_FULL,
@@ -443,20 +471,26 @@ func main() {
 
 	// Create SDK
 	var sdk *ycsdk.SDK
+
 	var err error
 
 	if ycSaJsonCredentials != "" {
 		// Create credentials
 		var key *iamkey.Key
+
 		key, err = iamkey.ReadFromJSONBytes([]byte(ycSaJsonCredentials))
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to read service account JSON: %v", err))
+
 			return
 		}
+
 		var credentials ycsdk.Credentials
+
 		credentials, err = ycsdk.ServiceAccountKey(key)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to create credentials: %v", err))
+
 			return
 		}
 
@@ -466,6 +500,7 @@ func main() {
 		})
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to create SDK: %v", err))
+
 			return
 		}
 
@@ -477,6 +512,7 @@ func main() {
 		})
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to create SDK: %v", err))
+
 			return
 		}
 
@@ -486,9 +522,11 @@ func main() {
 		// Since there's no direct equivalent in Go, we'll use a different approach
 		// This is a placeholder for now
 		sourcecraft.SetFailed("Token exchange not implemented in Go version yet")
+
 		return
 	} else {
 		sourcecraft.SetFailed("No credentials provided")
+
 		return
 	}
 
@@ -496,6 +534,7 @@ func main() {
 	vmParams, err := parseVMInputs()
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse VM inputs: %v", err))
+
 		return
 	}
 
@@ -503,15 +542,31 @@ func main() {
 
 	// Resolve service account ID if name is provided
 	if vmParams.ServiceAccountID == "" && vmParams.ServiceAccountName != "" {
-		serviceAccountID, err := serviceaccount.ResolveServiceAccountID(ctx, sdk, vmParams.FolderID, "", vmParams.ServiceAccountName)
+		serviceAccountID, err := serviceaccount.ResolveID(
+			ctx,
+			sdk,
+			vmParams.FolderID,
+			"",
+			vmParams.ServiceAccountName,
+		)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to resolve service account: %v", err))
+
 			return
 		}
+
 		if serviceAccountID == "" {
-			sourcecraft.SetFailed(fmt.Sprintf("There is no service account '%s' in folder %s", vmParams.ServiceAccountName, vmParams.FolderID))
+			sourcecraft.SetFailed(
+				fmt.Sprintf(
+					"There is no service account '%s' in folder %s",
+					vmParams.ServiceAccountName,
+					vmParams.FolderID,
+				),
+			)
+
 			return
 		}
+
 		vmParams.ServiceAccountID = serviceAccountID
 	}
 
@@ -519,6 +574,7 @@ func main() {
 	vmID, err := findVM(ctx, sdk, vmParams.FolderID, vmParams.Name)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to find VM: %v", err))
+
 		return
 	}
 
@@ -531,6 +587,7 @@ func main() {
 		err = createVM(ctx, sdk, vmParams, repoOwner, repoName)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to create VM: %v", err))
+
 			return
 		}
 	} else {
@@ -538,6 +595,7 @@ func main() {
 		err = detectMetadataConflict(ctx, sdk, vmID)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Metadata conflict detected: %v", err))
+
 			return
 		}
 
@@ -545,6 +603,7 @@ func main() {
 		err = updateMetadata(ctx, sdk, vmID, vmParams)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to update VM metadata: %v", err))
+
 			return
 		}
 	}

@@ -2,7 +2,7 @@ package function
 
 import "github.com/yandex-cloud/go-genproto/yandex/cloud/logging/v1"
 
-// ActionInputs represents the input parameters for the GitHub Action
+// ActionInputs represents the input parameters for the GitHub Action.
 type ActionInputs struct {
 	FolderID           string
 	FunctionName       string

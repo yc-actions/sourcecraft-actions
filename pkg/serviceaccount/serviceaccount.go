@@ -5,11 +5,15 @@ import (
 	"fmt"
 
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1"
-	"github.com/yandex-cloud/go-sdk"
+	ycsdk "github.com/yandex-cloud/go-sdk"
 )
 
-// ResolveServiceAccountID resolves a service account ID from either a direct ID or a service account name
-func ResolveServiceAccountID(ctx context.Context, sdk *ycsdk.SDK, folderID, serviceAccountID, serviceAccountName string) (string, error) {
+// ResolveID resolves a service account ID from either a direct ID or a service account name.
+func ResolveID(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	folderID, serviceAccountID, serviceAccountName string,
+) (string, error) {
 	if serviceAccountID != "" {
 		return serviceAccountID, nil
 	}

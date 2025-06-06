@@ -12,22 +12,20 @@ import (
 	"strings"
 	"time"
 
-	"sourcecraft-actions/internal/function"
-	"sourcecraft-actions/pkg/env"
-	"sourcecraft-actions/pkg/sourcecraft"
-
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/serverless/functions/v1"
-	"github.com/yandex-cloud/go-sdk"
+	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
+	"github.com/yc-actions/sourcecraft-actions/internal/function"
+	"github.com/yc-actions/sourcecraft-actions/pkg/env"
+	"github.com/yc-actions/sourcecraft-actions/pkg/loglevel"
+	"github.com/yc-actions/sourcecraft-actions/pkg/memory"
+	"github.com/yc-actions/sourcecraft-actions/pkg/serviceaccount"
+	"github.com/yc-actions/sourcecraft-actions/pkg/sourcecraft"
+	"github.com/yc-actions/sourcecraft-actions/pkg/storage"
 	"google.golang.org/protobuf/types/known/durationpb"
-
-	"sourcecraft-actions/pkg/loglevel"
-	"sourcecraft-actions/pkg/memory"
-	"sourcecraft-actions/pkg/serviceaccount"
-	"sourcecraft-actions/pkg/storage"
 )
 
-// Action inputs
+// Action inputs.
 const (
 	inputFolderID            = "FOLDER_ID"
 	inputFunctionName        = "FUNCTION_NAME"
@@ -63,7 +61,7 @@ const (
 	inputYcIamToken          = "YC_IAM_TOKEN"
 )
 
-// Secret represents a Lockbox secret
+// Secret represents a Lockbox secret.
 type Secret struct {
 	EnvironmentVariable string
 	ID                  string
@@ -71,28 +69,33 @@ type Secret struct {
 	Key                 string
 }
 
-// parseLockboxVariables parses Lockbox variables from a string slice
+// parseLockboxVariables parses Lockbox variables from a string slice.
 func parseLockboxVariables(secrets []string) []Secret {
 	sourcecraft.Info(fmt.Sprintf("Secrets string: %q", secrets))
 
 	var secretsArr []Secret
+
 	for _, line := range secrets {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", line))
+
 			continue
 		}
 
 		environmentVariable := parts[0]
+
 		values := strings.Split(parts[1], "/")
 		if len(values) != 3 {
 			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", line))
+
 			continue
 		}
 
 		id, versionID, key := values[0], values[1], values[2]
 		if environmentVariable == "" || id == "" || versionID == "" || key == "" {
 			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", line))
+
 			continue
 		}
 
@@ -105,22 +108,26 @@ func parseLockboxVariables(secrets []string) []Secret {
 	}
 
 	sourcecraft.Info(fmt.Sprintf("SecretsObject: %q", secretsArr))
+
 	return secretsArr
 }
 
-// parseIgnoreGlobPatterns parses ignore glob patterns from a string slice
+// parseIgnoreGlobPatterns parses ignore glob patterns from a string slice.
 func parseIgnoreGlobPatterns(patterns []string) []string {
 	var result []string
+
 	for _, pattern := range patterns {
 		if pattern != "" {
 			result = append(result, pattern)
 		}
 	}
+
 	sourcecraft.Info(fmt.Sprintf("Source ignore pattern: %q", result))
+
 	return result
 }
 
-// zipSources zips source files
+// zipSources zips source files.
 func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 	sourcecraft.StartGroup("ZipDirectory")
 	defer sourcecraft.EndGroup()
@@ -145,6 +152,7 @@ func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 		}
 
 		pathFromSourceRoot := filepath.Join(root, include)
+
 		matches, err := filepath.Glob(pathFromSourceRoot)
 		if err != nil {
 			return nil, fmt.Errorf("failed to glob pattern: %w", err)
@@ -158,6 +166,7 @@ func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 
 			if info.IsDir() {
 				sourcecraft.Debug(fmt.Sprintf("match: dir %s", match))
+
 				err = filepath.Walk(match, func(path string, info os.FileInfo, err error) error {
 					if err != nil {
 						return err
@@ -179,6 +188,7 @@ func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 						if err != nil {
 							return fmt.Errorf("failed to match pattern: %w", err)
 						}
+
 						if matched {
 							return nil
 						}
@@ -192,10 +202,12 @@ func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 				}
 			} else {
 				sourcecraft.Debug(fmt.Sprintf("match: file %s", match))
+
 				relPath, err := filepath.Rel(root, match)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get relative path: %w", err)
 				}
+
 				err = addFileToZip(zipWriter, match, relPath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to add file to zip: %w", err)
@@ -216,7 +228,7 @@ func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// addFileToZip adds a file to a zip writer
+// addFileToZip adds a file to a zip writer.
 func addFileToZip(zipWriter *zip.Writer, filePath, zipPath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -239,8 +251,13 @@ func addFileToZip(zipWriter *zip.Writer, filePath, zipPath string) error {
 	return nil
 }
 
-// uploadToS3 uploads a file to S3
-func uploadToS3(ctx context.Context, bucket, functionID string, sdk *ycsdk.SDK, fileContents []byte) (string, error) {
+// uploadToS3 uploads a file to S3.
+func uploadToS3(
+	ctx context.Context,
+	bucket, functionID string,
+	sdk *ycsdk.SDK,
+	fileContents []byte,
+) (string, error) {
 	// Get Sourcecraft SHA
 	sourcecraftSHA := sourcecraft.GetSourcecraftSHA()
 	if sourcecraftSHA == "" {
@@ -248,14 +265,14 @@ func uploadToS3(ctx context.Context, bucket, functionID string, sdk *ycsdk.SDK, 
 	}
 
 	// Set object name
-	bucketObjectName := fmt.Sprintf("%s/%s.zip", functionID, sourcecraftSHA)
-	sourcecraft.Info(fmt.Sprintf("Upload to bucket: %q", bucket+"/"+bucketObjectName))
+	objectName := fmt.Sprintf("%s/%s.zip", functionID, sourcecraftSHA)
+	sourcecraft.Info(fmt.Sprintf("Upload to bucket: %q", bucket+"/"+objectName))
 
 	// Create storage service
 	storageService := storage.NewStorageService(sdk)
 
 	// Create storage object
-	storageObject := storage.NewStorageObjectFromBytes(bucket, bucketObjectName, fileContents)
+	storageObject := storage.NewStorageObject(bucket, objectName, io.NopCloser(bytes.NewReader(fileContents)))
 
 	// Upload object
 	err := storageService.PutObject(ctx, storageObject)
@@ -263,16 +280,21 @@ func uploadToS3(ctx context.Context, bucket, functionID string, sdk *ycsdk.SDK, 
 		return "", fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	return bucketObjectName, nil
+	return objectName, nil
 }
 
-// getOrCreateFunctionID gets or creates a function ID
-func getOrCreateFunctionID(ctx context.Context, sdk *ycsdk.SDK, inputs *function.ActionInputs) (string, error) {
+// getOrCreateFunctionID gets or creates a function ID.
+func getOrCreateFunctionID(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	inputs *function.ActionInputs,
+) (string, error) {
 	sourcecraft.StartGroup("Find function id")
 	defer sourcecraft.EndGroup()
 
 	// List functions
 	functionService := sdk.Serverless().Functions()
+
 	resp, err := functionService.Function().List(ctx, &functions.ListFunctionsRequest{
 		FolderId: inputs.FolderID,
 		Filter:   fmt.Sprintf("name = '%s'", inputs.FunctionName),
@@ -284,17 +306,26 @@ func getOrCreateFunctionID(ctx context.Context, sdk *ycsdk.SDK, inputs *function
 	// If function exists, return its ID
 	if len(resp.Functions) > 0 {
 		functionID := resp.Functions[0].Id
-		sourcecraft.Info(fmt.Sprintf("There is the function named '%s' in the folder already. Its id is '%s'", inputs.FunctionName, functionID))
+		sourcecraft.Info(
+			fmt.Sprintf(
+				"There is the function named '%s' in the folder already. Its id is '%s'",
+				inputs.FunctionName,
+				functionID,
+			),
+		)
 		sourcecraft.SetOutput("function-id", functionID)
+
 		return functionID, nil
 	}
 
 	// Otherwise create a new function
-	op, err := sdk.WrapOperation(functionService.Function().Create(ctx, &functions.CreateFunctionRequest{
-		FolderId:    inputs.FolderID,
-		Name:        inputs.FunctionName,
-		Description: inputs.Description,
-	}))
+	op, err := sdk.WrapOperation(
+		functionService.Function().Create(ctx, &functions.CreateFunctionRequest{
+			FolderId:    inputs.FolderID,
+			Name:        inputs.FunctionName,
+			Description: inputs.Description,
+		}),
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create function: %w", err)
 	}
@@ -304,25 +335,42 @@ func getOrCreateFunctionID(ctx context.Context, sdk *ycsdk.SDK, inputs *function
 	if err != nil {
 		return "", fmt.Errorf("failed to wait for operation: %w", err)
 	}
+
 	meta, err := op.Metadata()
 	if err != nil {
 		return "", fmt.Errorf("failed to get operation metadata: %w", err)
 	}
 	// Get function ID from metadata
 	var createFunctionMetadata *functions.CreateFunctionMetadata
+
 	if ok := meta.(*functions.CreateFunctionMetadata) != nil; !ok {
 		return "", fmt.Errorf("failed to unmarshal metadata: %w", err)
 	}
+
 	createFunctionMetadata = meta.(*functions.CreateFunctionMetadata)
 
 	functionID := createFunctionMetadata.FunctionId
-	sourcecraft.Info(fmt.Sprintf("There was no function named '%s' in the folder. So it was created. Id is '%s'", inputs.FunctionName, functionID))
+	sourcecraft.Info(
+		fmt.Sprintf(
+			"There was no function named '%s' in the folder. So it was created. Id is '%s'",
+			inputs.FunctionName,
+			functionID,
+		),
+	)
 	sourcecraft.SetOutput("function-id", functionID)
+
 	return functionID, nil
 }
 
-// createFunctionVersion creates a function version
-func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID string, fileContents []byte, bucketObjectName string, inputs *function.ActionInputs) error {
+// createFunctionVersion creates a function version.
+func createFunctionVersion(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	functionID string,
+	fileContents []byte,
+	bucketObjectName string,
+	inputs *function.ActionInputs,
+) error {
 	sourcecraft.StartGroup("Create function version")
 	defer sourcecraft.EndGroup()
 
@@ -331,7 +379,13 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 	sourcecraft.Info(fmt.Sprintf("Parsed timeout: %d", inputs.ExecutionTimeout))
 
 	// Resolve service account ID
-	serviceAccountID, err := serviceaccount.ResolveServiceAccountID(ctx, sdk, inputs.FolderID, inputs.ServiceAccount, inputs.ServiceAccountName)
+	serviceAccountID, err := serviceaccount.ResolveID(
+		ctx,
+		sdk,
+		inputs.FolderID,
+		inputs.ServiceAccount,
+		inputs.ServiceAccountName,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to resolve service account: %w", err)
 	}
@@ -359,12 +413,15 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 		},
 	}
 
-	// Set up async invocation config
-	asyncConfig, err := function.CreateAsyncInvocationConfig(ctx, sdk, inputs)
-	if err != nil {
-		return fmt.Errorf("failed to create async invocation config: %w", err)
+	if function.IsAsync(inputs) {
+		// Set up async invocation config
+		asyncConfig, err := function.CreateAsyncInvocationConfig(ctx, sdk, inputs)
+		if err != nil {
+			return fmt.Errorf("failed to create async invocation config: %w", err)
+		}
+
+		request.AsyncInvocationConfig = asyncConfig
 	}
-	request.AsyncInvocationConfig = asyncConfig
 
 	// Set up secrets
 	secrets := parseLockboxVariables(inputs.Secrets)
@@ -389,10 +446,12 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 			},
 		}
 	} else {
-		// 3.5 MB
-		if len(fileContents) > 3670016 {
+		const limit = 3670016 // 3.5 MB
+
+		if len(fileContents) > limit {
 			return fmt.Errorf("zip file is too big: %d bytes. Provide bucket name", len(fileContents))
 		}
+
 		request.PackageSource = &functions.CreateFunctionVersionRequest_Content{
 			Content: fileContents,
 		}
@@ -400,6 +459,7 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 
 	// Create function version
 	functionService := sdk.Serverless().Functions()
+
 	op, err := sdk.WrapOperation(functionService.Function().CreateVersion(ctx, request))
 	if err != nil {
 		return fmt.Errorf("failed to create function version: %w", err)
@@ -412,6 +472,7 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 	}
 
 	sourcecraft.Info("Operation complete")
+
 	meta, err := op.Metadata()
 	if err != nil {
 		return fmt.Errorf("failed to get operation metadata: %w", err)
@@ -419,12 +480,14 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 
 	// Get version ID from metadata
 	var createFunctionVersionMetadata *functions.CreateFunctionVersionMetadata
-	createFunctionVersionMetadata = meta.(*functions.CreateFunctionVersionMetadata)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal metadata: %w", err)
+	createFunctionVersionMetadata, ok := meta.(*functions.CreateFunctionVersionMetadata)
+
+	if !ok {
+		return fmt.Errorf("failed to unmarshal metadata")
 	}
 
 	sourcecraft.SetOutput("version-id", createFunctionVersionMetadata.FunctionVersionId)
+
 	return nil
 }
 
@@ -434,23 +497,27 @@ func main() {
 	// Parse inputs
 	ycSaJsonCredentials := sourcecraft.GetInput(inputYcSaJsonCredentials)
 	ycIamToken := sourcecraft.GetInput(inputYcIamToken)
-	//ycSaID := sourcecraft.GetInput(inputYcSaID)
 
 	// Create SDK
 	var sdk *ycsdk.SDK
+
 	var err error
 
 	if ycSaJsonCredentials != "" {
-
 		// Create credentials
 		key, err := iamkey.ReadFromJSONBytes([]byte(ycSaJsonCredentials))
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to read service account JSON: %v", err))
+
 			return
 		}
+
 		credentials, err := ycsdk.ServiceAccountKey(key)
 		if err != nil {
-			sourcecraft.SetFailed(fmt.Sprintf("Failed to create credentials from service account JSON: %v", err))
+			sourcecraft.SetFailed(
+				fmt.Sprintf("Failed to create credentials from service account JSON: %v", err),
+			)
+
 			return
 		}
 
@@ -460,6 +527,7 @@ func main() {
 		})
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to create SDK: %v", err))
+
 			return
 		}
 
@@ -471,12 +539,14 @@ func main() {
 		})
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to create SDK: %v", err))
+
 			return
 		}
 
 		sourcecraft.Info("Using IAM token")
 	} else {
 		sourcecraft.SetFailed("No credentials")
+
 		return
 	}
 
@@ -485,9 +555,11 @@ func main() {
 	if memoryStr == "" {
 		memoryStr = "128Mb"
 	}
+
 	memoryValue, err := memory.ParseMemory(memoryStr)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse memory: %v", err))
+
 		return
 	}
 
@@ -496,17 +568,21 @@ func main() {
 	if executionTimeoutStr == "" {
 		executionTimeoutStr = "5"
 	}
+
 	executionTimeout, err := strconv.Atoi(executionTimeoutStr)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse execution timeout: %v", err))
+
 		return
 	}
 
 	// Parse log level
 	logLevelStr := sourcecraft.GetInput(inputLogLevel)
+
 	logLevel, err := loglevel.ParseLogLevel(logLevelStr)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse log level: %v", err))
+
 		return
 	}
 
@@ -515,9 +591,11 @@ func main() {
 	if asyncRetriesCountStr == "" {
 		asyncRetriesCountStr = "3"
 	}
+
 	asyncRetriesCount, err := strconv.Atoi(asyncRetriesCountStr)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse async retries count: %v", err))
+
 		return
 	}
 
@@ -565,18 +643,25 @@ func main() {
 	// Validate inputs
 	if inputs.FolderID == "" {
 		sourcecraft.SetFailed("folder-id is required")
+
 		return
 	}
+
 	if inputs.FunctionName == "" {
 		sourcecraft.SetFailed("function-name is required")
+
 		return
 	}
+
 	if inputs.Runtime == "" {
 		sourcecraft.SetFailed("runtime is required")
+
 		return
 	}
+
 	if inputs.Entrypoint == "" {
 		sourcecraft.SetFailed("entrypoint is required")
+
 		return
 	}
 
@@ -584,6 +669,7 @@ func main() {
 	err = function.ValidateAsync(inputs)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Invalid async configuration: %v", err))
+
 		return
 	}
 
@@ -591,6 +677,7 @@ func main() {
 	fileContents, err := zipSources(inputs)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to zip sources: %v", err))
+
 		return
 	}
 
@@ -600,6 +687,7 @@ func main() {
 	functionID, err := getOrCreateFunctionID(ctx, sdk, inputs)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to get or create function: %v", err))
+
 		return
 	}
 
@@ -609,6 +697,7 @@ func main() {
 		bucketObjectName, err = uploadToS3(ctx, inputs.Bucket, functionID, sdk, fileContents)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to upload to S3: %v", err))
+
 			return
 		}
 	}
@@ -617,6 +706,7 @@ func main() {
 	err = createFunctionVersion(ctx, sdk, functionID, fileContents, bucketObjectName, inputs)
 	if err != nil {
 		sourcecraft.SetFailed(fmt.Sprintf("Failed to create function version: %v", err))
+
 		return
 	}
 
