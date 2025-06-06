@@ -1,5 +1,7 @@
 FROM golang:1.24 AS builder
 
+ARG APP_NAME=function
+
 ENV GO111MODULE=on \
   CGO_ENABLED=0 \
   GOOS=linux \
@@ -11,7 +13,7 @@ COPY . .
 RUN go build \
   -ldflags "-s -w -extldflags '-static'" \
   -o /bin/app \
-  ./cmd/function/main.go
+  ./cmd/${APP_NAME}/main.go
 
 
 
