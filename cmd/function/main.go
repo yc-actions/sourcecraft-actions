@@ -4,10 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -27,12 +25,6 @@ import (
 	"sourcecraft-actions/pkg/memory"
 	"sourcecraft-actions/pkg/serviceaccount"
 	"sourcecraft-actions/pkg/storage"
-)
-
-// Environment variables
-const (
-	EnvSourcecraftSHA       = "SOURCECRAFT_COMMIT_SHA"
-	EnvSourcecraftWorkspace = "SOURCECRAFT_WORKSPACE"
 )
 
 // Action inputs
@@ -138,10 +130,7 @@ func zipSources(inputs *function.ActionInputs) ([]byte, error) {
 	zipWriter := zip.NewWriter(buf)
 
 	// Get workspace directory
-	workspace := os.Getenv(EnvSourcecraftWorkspace)
-	if workspace == "" {
-		workspace = "."
-	}
+	workspace := sourcecraft.GetSourcecraftWorkspace()
 
 	// Get source root
 	root := filepath.Join(workspace, inputs.SourceRoot)
@@ -252,14 +241,14 @@ func addFileToZip(zipWriter *zip.Writer, filePath, zipPath string) error {
 
 // uploadToS3 uploads a file to S3
 func uploadToS3(ctx context.Context, bucket, functionID string, sdk *ycsdk.SDK, fileContents []byte) (string, error) {
-	// Get GITHUB_SHA
-	githubSHA := os.Getenv(EnvSourcecraftSHA)
-	if githubSHA == "" {
-		return "", fmt.Errorf("missing GITHUB_SHA")
+	// Get Sourcecraft SHA
+	sourcecraftSHA := sourcecraft.GetSourcecraftSHA()
+	if sourcecraftSHA == "" {
+		return "", fmt.Errorf("missing SOURCECRAFT_COMMIT_SHA")
 	}
 
 	// Set object name
-	bucketObjectName := fmt.Sprintf("%s/%s.zip", functionID, githubSHA)
+	bucketObjectName := fmt.Sprintf("%s/%s.zip", functionID, sourcecraftSHA)
 	sourcecraft.Info(fmt.Sprintf("Upload to bucket: %q", bucket+"/"+bucketObjectName))
 
 	// Create storage service
@@ -437,61 +426,6 @@ func createFunctionVersion(ctx context.Context, sdk *ycsdk.SDK, functionID strin
 
 	sourcecraft.SetOutput("version-id", createFunctionVersionMetadata.FunctionVersionId)
 	return nil
-}
-
-// exchangeToken exchanges a GitHub token for a Yandex Cloud token
-func exchangeToken(githubToken, saID string) (string, error) {
-	sourcecraft.Info(fmt.Sprintf("Exchanging token for service account %s", saID))
-
-	// Create request
-	reqBody := fmt.Sprintf(
-		"grant_type=urn:ietf:params:oauth:grant-type:token-exchange&"+
-			"requested_token_type=urn:ietf:params:oauth:token-type:access_token&"+
-			"audience=%s&"+
-			"subject_token=%s&"+
-			"subject_token_type=urn:ietf:params:oauth:token-type:id_token",
-		saID, githubToken,
-	)
-
-	// Send request
-	resp, err := http.Post(
-		"https://auth.yandex.cloud/oauth/token",
-		"application/x-www-form-urlencoded",
-		strings.NewReader(reqBody),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to exchange token: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to exchange token: %d %s", resp.StatusCode, resp.Status)
-	}
-
-	// Parse response
-	var result struct {
-		AccessToken string `json:"access_token"`
-		Error       string `json:"error"`
-		ErrorDesc   string `json:"error_description"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse token response: %w", err)
-	}
-
-	// Check for error
-	if result.Error != "" {
-		return "", fmt.Errorf("failed to exchange token: %s %s", result.Error, result.ErrorDesc)
-	}
-
-	// Check for missing token
-	if result.AccessToken == "" {
-		return "", fmt.Errorf("failed to exchange token: no access_token in response")
-	}
-
-	sourcecraft.Info("Token exchanged successfully")
-	return result.AccessToken, nil
 }
 
 func main() {

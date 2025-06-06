@@ -6,6 +6,14 @@ import (
 	"strings"
 )
 
+// Environment variables
+const (
+	EnvSourcecraftWorkspace       = "SOURCECRAFT_WORKSPACE"
+	EnvSourcecraftSHA             = "SOURCECRAFT_COMMIT_SHA"
+	EnvSourcecraftRepositoryOwner = "SOURCECRAFT_REPOSITORY_OWNER"
+	EnvSourcecraftRepository      = "SOURCECRAFT_REPOSITORY"
+)
+
 // GetInput gets an input value from environment variables
 func GetInput(name string) string {
 	return os.Getenv(name)
@@ -68,4 +76,77 @@ func StartGroup(name string) {
 // EndGroup ends a log group
 func EndGroup() {
 	fmt.Println("::endgroup::")
+}
+
+// GetSourcecraftWorkspace gets the Sourcecraft workspace directory
+func GetSourcecraftWorkspace() string {
+	workspace := os.Getenv(EnvSourcecraftWorkspace)
+	if workspace == "" {
+		workspace = "."
+	}
+	return workspace
+}
+
+// GetSourcecraftSHA gets the Sourcecraft commit SHA
+func GetSourcecraftSHA() string {
+	return os.Getenv(EnvSourcecraftSHA)
+}
+
+// parseRepoOwnerFromURL extracts the repository owner from a URL string
+func parseRepoOwnerFromURL(repoURL string) string {
+	if repoURL == "" {
+		return ""
+	}
+
+	// Remove protocol part if exists
+	if idx := strings.Index(repoURL, "://"); idx != -1 {
+		repoURL = repoURL[idx+3:]
+	}
+
+	// Split by '/' and get the owner part (after hostname)
+	parts := strings.Split(repoURL, "/")
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+
+	return ""
+}
+
+// GetSourcecraftRepositoryOwner extracts the repository owner from SOURCECRAFT_REPO_URL
+func GetSourcecraftRepositoryOwner() string {
+	repoURL := os.Getenv("SOURCECRAFT_REPO_URL")
+	return parseRepoOwnerFromURL(repoURL)
+}
+
+// GetSourcecraftRepository extracts the repository name from SOURCECRAFT_REPO_URL
+// parseRepoNameFromURL extracts the repository name from a URL string
+func parseRepoNameFromURL(repoURL string) string {
+	if repoURL == "" {
+		return ""
+	}
+
+	// Remove protocol part if exists
+	if idx := strings.Index(repoURL, "://"); idx != -1 {
+		repoURL = repoURL[idx+3:]
+	}
+
+	// Split by '/' and get the last part
+	parts := strings.Split(repoURL, "/")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	// Remove .git suffix if present
+	repoName := parts[len(parts)-1]
+	if strings.HasSuffix(repoName, ".git") {
+		repoName = repoName[:len(repoName)-4]
+	}
+
+	return repoName
+}
+
+// GetSourcecraftRepository extracts the repository name from SOURCECRAFT_REPO_URL
+func GetSourcecraftRepository() string {
+	repoURL := os.Getenv("SOURCECRAFT_REPO_URL")
+	return parseRepoNameFromURL(repoURL)
 }
