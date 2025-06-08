@@ -8,6 +8,8 @@ import (
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/serverless/apigateway/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
+	"github.com/yc-actions/sourcecraft-actions/internal/container"
+	"github.com/yc-actions/sourcecraft-actions/pkg/env"
 	"github.com/yc-actions/sourcecraft-actions/pkg/sourcecraft"
 )
 
@@ -19,6 +21,7 @@ const (
 	inputSpec                = "spec"
 	inputYcSaJsonCredentials = "yc-sa-json-credentials"
 	inputYcIamToken          = "yc-iam-token"
+	inputVariables           = "variables" // Optional input for additional variables in the spec
 )
 
 // Gateway represents an API Gateway.
@@ -61,6 +64,8 @@ func main() {
 
 		return
 	}
+
+	variables := env.ParseEnvironmentVariables(sourcecraft.GetMultilineInput(inputVariables))
 
 	// Get credentials
 	ycSaJsonCredentials := sourcecraft.GetInput(inputYcSaJsonCredentials)
@@ -134,6 +139,14 @@ func main() {
 		}
 	} else {
 		specContent = []byte(gatewaySpec)
+	}
+
+	// Replace variables in the spec content
+	specContent, err = container.ReplaceVariablesInSpec(specContent, variables)
+	if err != nil {
+		sourcecraft.SetFailed(fmt.Sprintf("Failed to replace variables in spec: %v", err))
+
+		return
 	}
 
 	// Check if the gateway exists
