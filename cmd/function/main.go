@@ -432,7 +432,7 @@ func createFunctionVersion(
 		return fmt.Errorf("failed to unmarshal metadata")
 	}
 
-	sourcecraft.SetOutput("version-id", createFunctionVersionMetadata.FunctionVersionId)
+	sourcecraft.SetOutput("VERSION_ID", createFunctionVersionMetadata.FunctionVersionId)
 
 	return nil
 }

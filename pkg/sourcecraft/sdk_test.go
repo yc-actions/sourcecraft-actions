@@ -261,6 +261,7 @@ func TestSetEnv(t *testing.T) {
 
 	// Set the SOURCECRAFT_ENV environment variable to point to the temporary file
 	os.Setenv("SOURCECRAFT_ENV", tmpFile.Name())
+	os.Setenv("SOURCECRAFT_CUBE", "test-cube")
 	defer os.Unsetenv("SOURCECRAFT_ENV") // Clean up the environment variable
 
 	// Test case 1: Setting a variable when the file is empty
@@ -272,7 +273,7 @@ func TestSetEnv(t *testing.T) {
 		t.Fatalf("Failed to read file: %v", err)
 	}
 
-	expected1 := "TEST_KEY1=TEST_VALUE1\n"
+	expected1 := "TEST_CUBE_TEST_KEY1=TEST_VALUE1\n"
 	if string(content) != expected1 {
 		t.Errorf("SetOutput() with empty file = %v, want %v", string(content), expected1)
 	}
@@ -286,7 +287,7 @@ func TestSetEnv(t *testing.T) {
 		t.Fatalf("Failed to read file: %v", err)
 	}
 
-	expected2 := "TEST_KEY1=TEST_VALUE1\nTEST_KEY2=TEST_VALUE2\n"
+	expected2 := "TEST_CUBE_TEST_KEY1=TEST_VALUE1\nTEST_CUBE_TEST_KEY2=TEST_VALUE2\n"
 	if string(content) != expected2 {
 		t.Errorf("SetOutput() with existing content = %v, want %v", string(content), expected2)
 	}
@@ -300,8 +301,62 @@ func TestSetEnv(t *testing.T) {
 		t.Fatalf("Failed to read file: %v", err)
 	}
 
-	expected3 := "TEST_KEY1=TEST_VALUE1\nTEST_KEY2=TEST_VALUE2\nTEST_KEY3=TEST_VALUE3\n"
+	expected3 := "TEST_CUBE_TEST_KEY1=TEST_VALUE1\nTEST_CUBE_TEST_KEY2=TEST_VALUE2\nTEST_CUBE_TEST_KEY3=TEST_VALUE3\n"
 	if string(content) != expected3 {
 		t.Errorf("SetOutput() with multiple values = %v, want %v", string(content), expected3)
+	}
+}
+
+func Test_upperSnakeCase(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Empty string",
+			args: args{s: ""},
+			want: "",
+		},
+		{
+			name: "Single word",
+			args: args{s: "hello"},
+			want: "HELLO",
+		},
+		{
+			name: "camelCase",
+			args: args{s: "camelCase"},
+			want: "CAMEL_CASE",
+		},
+		{
+			name: "snake_case",
+			args: args{s: "snake_case"},
+			want: "SNAKE_CASE",
+		},
+		{
+			name: "MixedCase",
+			args: args{s: "MixedCase"},
+			want: "MIXED_CASE",
+		},
+		{
+			name: "kebab-case",
+			args: args{s: "kebab-case"},
+			want: "KEBAB_CASE",
+		},
+		{
+			name: "UPPER_CASE",
+			args: args{s: "UPPER_CASE"},
+			want: "UPPER_CASE",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sourcecraft.UpperSnakeCase(tt.args.s); got != tt.want {
+				t.Errorf("upperSnakeCase() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

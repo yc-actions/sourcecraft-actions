@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // Environment variables.
@@ -105,9 +106,7 @@ func GetInt64InputOpt(name string) *int64 {
 // SetOutput sets an environment variable that will be available to subsequent cubes.
 // It appends a KEY=VALUE pair to the file specified by the SOURCECRAFT_ENV environment variable.
 func SetOutput(name, value string) {
-	cubeName := strings.ToUpper(strings.Replace(
-		os.Getenv("SOURCECRAFT_CUBE"),
-		"-", "_", -1))
+	cubeName := os.Getenv("SOURCECRAFT_CUBE")
 
 	// Get the file path from the SOURCECRAFT_ENV environment variable
 	filePath := os.Getenv("SOURCECRAFT_ENV")
@@ -126,12 +125,35 @@ func SetOutput(name, value string) {
 	defer file.Close() // Ensure the file is closed when the function returns
 
 	// Create the KEY=VALUE pair
-	data := fmt.Sprintf("%s_%s=%s\n", cubeName, name, value)
+	data := fmt.Sprintf("%s_%s=%s\n", UpperSnakeCase(cubeName), UpperSnakeCase(name), value)
 
 	// Write the data to the file
 	if _, err := file.WriteString(data); err != nil {
 		ErrorLog(fmt.Sprintf("Failed to write to file %s: %v", filePath, err))
 	}
+}
+
+func UpperSnakeCase(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	// Replace hyphens with underscores
+	s = strings.ReplaceAll(s, "-", "_")
+
+	var result strings.Builder
+
+	for i, char := range s {
+		// If it's an uppercase letter and not the first character
+		// and the previous character is not an underscore or uppercase letter, add an underscore
+		if i > 0 && char >= 'A' && char <= 'Z' && s[i-1] != '_' && (s[i-1] < 'A' || s[i-1] > 'Z') {
+			result.WriteRune('_')
+		}
+		// Convert to uppercase and add to result
+		result.WriteRune(unicode.ToUpper(char))
+	}
+
+	return result.String()
 }
 
 // SetFailed sets the action as failed.
