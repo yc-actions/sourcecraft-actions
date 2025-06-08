@@ -15,11 +15,11 @@ import (
 
 // Input constants.
 const (
-	inputFolderID            = "folder-id"
-	inputContainerName       = "container-name"
-	inputPublic              = "public"
-	inputYcSaJsonCredentials = "yc-sa-json-credentials"
-	inputYcIamToken          = "yc-iam-token"
+	inputFolderID            = "FOLDER_ID"
+	inputContainerName       = "CONTAINER_NAME"
+	inputPublic              = "PUBLIC"
+	inputYcSaJsonCredentials = "YC_SA_JSON_CREDENTIALS"
+	inputYcIamToken          = "YC_IAM_TOKEN"
 )
 
 // createRevision creates a new revision for a container.

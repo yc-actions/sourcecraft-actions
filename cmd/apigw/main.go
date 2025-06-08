@@ -15,13 +15,13 @@ import (
 
 // Input constants.
 const (
-	inputFolderID            = "folder-id"
-	inputGatewayName         = "gateway-name"
-	inputSpecFile            = "spec-file"
-	inputSpec                = "spec"
-	inputYcSaJsonCredentials = "yc-sa-json-credentials"
-	inputYcIamToken          = "yc-iam-token"
-	inputVariables           = "variables" // Optional input for additional variables in the spec
+	inputFolderID            = "FOLDER_ID"
+	inputGatewayName         = "GATEWAY_NAME"
+	inputSpecFile            = "SPEC_FILE"
+	inputSpec                = "SPEC"
+	inputYcSaJsonCredentials = "YC_SA_JSON_CREDENTIALS"
+	inputYcIamToken          = "YC_IAM_TOKEN"
+	inputVariables           = "VARIABLES" // Optional input for additional variables in the spec
 )
 
 // Gateway represents an API Gateway.
