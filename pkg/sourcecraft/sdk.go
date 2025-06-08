@@ -102,9 +102,36 @@ func GetInt64InputOpt(name string) *int64 {
 	return &intValue
 }
 
-// SetOutput sets an output value.
+// SetOutput sets an environment variable that will be available to subsequent cubes.
+// It appends a KEY=VALUE pair to the file specified by the SOURCECRAFT_ENV environment variable.
 func SetOutput(name, value string) {
-	fmt.Printf("::set-output name=%s::%s\n", name, value)
+	cubeName := strings.ToUpper(strings.Replace(
+		os.Getenv("SOURCECRAFT_CUBE"),
+		"-", "_", -1))
+
+	// Get the file path from the SOURCECRAFT_ENV environment variable
+	filePath := os.Getenv("SOURCECRAFT_ENV")
+	if filePath == "" {
+		// If SOURCECRAFT_ENV is not set, log an error and return
+		ErrorLog("SOURCECRAFT_ENV environment variable is not set")
+		return
+	}
+
+	// Open the file in append mode, create it if it doesn't exist
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		ErrorLog(fmt.Sprintf("Failed to open file %s: %v", filePath, err))
+		return
+	}
+	defer file.Close() // Ensure the file is closed when the function returns
+
+	// Create the KEY=VALUE pair
+	data := fmt.Sprintf("%s_%s=%s\n", cubeName, name, value)
+
+	// Write the data to the file
+	if _, err := file.WriteString(data); err != nil {
+		ErrorLog(fmt.Sprintf("Failed to write to file %s: %v", filePath, err))
+	}
 }
 
 // SetFailed sets the action as failed.

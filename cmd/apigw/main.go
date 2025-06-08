@@ -186,8 +186,8 @@ func main() {
 		sourcecraft.Info(fmt.Sprintf("Gateway successfully created. Id: %s", gateway.ID))
 	}
 	// Set outputs
-	sourcecraft.SetOutput("id", gateway.ID)
-	sourcecraft.SetOutput("domain", gateway.Domain)
+	sourcecraft.SetOutput("GATEWAY_ID", gateway.ID)
+	sourcecraft.SetOutput("GATEWAY_DOMAIN", gateway.Domain)
 }
 
 func createGateway(

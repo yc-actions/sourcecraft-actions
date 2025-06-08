@@ -412,8 +412,8 @@ func main() {
 	sourcecraft.Info(fmt.Sprintf("Revision created successfully. Id: %s", revisionID))
 
 	// Set outputs
-	sourcecraft.SetOutput("id", containerID)
-	sourcecraft.SetOutput("rev", revisionID)
+	sourcecraft.SetOutput("CONTAINER_ID", containerID)
+	sourcecraft.SetOutput("REVISION_ID", revisionID)
 
 	// Make the container public if requested
 	if isPublic {

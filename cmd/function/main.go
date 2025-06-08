@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/serverless/functions/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
@@ -260,7 +259,7 @@ func getOrCreateFunctionID(
 				functionID,
 			),
 		)
-		sourcecraft.SetOutput("function-id", functionID)
+		sourcecraft.SetOutput("FUNCTION_ID", functionID)
 
 		return functionID, nil
 	}
@@ -304,7 +303,7 @@ func getOrCreateFunctionID(
 			functionID,
 		),
 	)
-	sourcecraft.SetOutput("function-id", functionID)
+	sourcecraft.SetOutput("FUNCTION_ID", functionID)
 
 	return functionID, nil
 }
@@ -636,7 +635,4 @@ func main() {
 
 		return
 	}
-
-	// Set output
-	sourcecraft.SetOutput("time", time.Now().Format(time.RFC3339))
 }

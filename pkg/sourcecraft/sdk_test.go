@@ -250,3 +250,58 @@ func TestGetMultilineInputDefault(t *testing.T) {
 	os.Unsetenv("MULTILINE_VAR")
 	os.Unsetenv("EMPTY_VAR")
 }
+
+func TestSetEnv(t *testing.T) {
+	// Create a temporary file to use as the SOURCECRAFT_ENV file
+	tmpFile, err := os.CreateTemp("", "sourcecraft_env_test")
+	if err != nil {
+		t.Fatalf("Failed to create temporary file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name()) // Clean up the file when the test is done
+
+	// Set the SOURCECRAFT_ENV environment variable to point to the temporary file
+	os.Setenv("SOURCECRAFT_ENV", tmpFile.Name())
+	defer os.Unsetenv("SOURCECRAFT_ENV") // Clean up the environment variable
+
+	// Test case 1: Setting a variable when the file is empty
+	sourcecraft.SetOutput("TEST_KEY1", "TEST_VALUE1")
+
+	// Read the file content
+	content, err := os.ReadFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+
+	expected1 := "TEST_KEY1=TEST_VALUE1\n"
+	if string(content) != expected1 {
+		t.Errorf("SetOutput() with empty file = %v, want %v", string(content), expected1)
+	}
+
+	// Test case 2: Setting a variable when the file already has content
+	sourcecraft.SetOutput("TEST_KEY2", "TEST_VALUE2")
+
+	// Read the file content again
+	content, err = os.ReadFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+
+	expected2 := "TEST_KEY1=TEST_VALUE1\nTEST_KEY2=TEST_VALUE2\n"
+	if string(content) != expected2 {
+		t.Errorf("SetOutput() with existing content = %v, want %v", string(content), expected2)
+	}
+
+	// Test case 3: Setting another variable
+	sourcecraft.SetOutput("TEST_KEY3", "TEST_VALUE3")
+
+	// Read the file content again
+	content, err = os.ReadFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+
+	expected3 := "TEST_KEY1=TEST_VALUE1\nTEST_KEY2=TEST_VALUE2\nTEST_KEY3=TEST_VALUE3\n"
+	if string(content) != expected3 {
+		t.Errorf("SetOutput() with multiple values = %v, want %v", string(content), expected3)
+	}
+}

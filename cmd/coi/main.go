@@ -134,17 +134,17 @@ func prepareConfig(filePath string) (string, error) {
 
 // setOutputs sets the outputs for the Sourcecraft Action.
 func setOutputs(instance *compute.Instance) {
-	sourcecraft.SetOutput("instance-id", instance.Id)
+	sourcecraft.SetOutput("INSTANCE_ID", instance.Id)
 
 	if instance.BootDisk != nil {
-		sourcecraft.SetOutput("disk-id", instance.BootDisk.DiskId)
+		sourcecraft.SetOutput("DISK_ID", instance.BootDisk.DiskId)
 	}
 
 	if len(instance.NetworkInterfaces) > 0 &&
 		instance.NetworkInterfaces[0].PrimaryV4Address != nil &&
 		instance.NetworkInterfaces[0].PrimaryV4Address.OneToOneNat != nil {
 		sourcecraft.SetOutput(
-			"public-ip",
+			"PUBLIC_IP",
 			instance.NetworkInterfaces[0].PrimaryV4Address.OneToOneNat.Address,
 		)
 	}
@@ -165,7 +165,7 @@ func createVM(
 	sourcecraft.StartGroup("Create new VM")
 	defer sourcecraft.EndGroup()
 
-	sourcecraft.SetOutput("created", "true")
+	sourcecraft.SetOutput("VM_CREATED", "true")
 
 	userData, err := prepareConfig(vmParams.UserDataPath)
 	if err != nil {
