@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/compute/v1"
@@ -368,15 +367,7 @@ func parseVMInputs() (*VMParams, error) {
 		platformID = "standard-v3"
 	}
 
-	coresStr := sourcecraft.GetInput(inputVMCores)
-	if coresStr == "" {
-		coresStr = "2"
-	}
-
-	cores, err := strconv.ParseInt(coresStr, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse vm-cores: %w", err)
-	}
+	cores := sourcecraft.GetInt64Input(inputVMCores, 2)
 
 	memoryStr := sourcecraft.GetInput(inputVMMemory)
 	if memoryStr == "" {
@@ -403,15 +394,7 @@ func parseVMInputs() (*VMParams, error) {
 		return nil, fmt.Errorf("failed to parse vm-disk-size: %w", err)
 	}
 
-	coreFractionStr := sourcecraft.GetInput(inputVMCoreFraction)
-	if coreFractionStr == "" {
-		coreFractionStr = "100"
-	}
-
-	coreFraction, err := strconv.ParseInt(coreFractionStr, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse vm-core-fraction: %w", err)
-	}
+	coreFraction := sourcecraft.GetInt64Input(inputVMCoreFraction, 100)
 
 	return &VMParams{
 		UserDataPath:       userDataPath,

@@ -3,6 +3,7 @@ package sourcecraft
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -41,6 +42,64 @@ func GetBooleanInput(name string) bool {
 	value := strings.ToLower(GetInput(name))
 
 	return value == "true" || value == "yes" || value == "1"
+}
+
+// getIntInput gets an integer input value from environment variables.
+// If the input is empty or not a valid integer, it returns the default value.
+// If the input is not a valid integer, it sets a failure message.
+func getIntInput(name string, defaultValue int64, base int) (int64, error) {
+	value := GetInput(name)
+	if value == "" {
+		return defaultValue, nil
+	}
+
+	intValue, err := strconv.ParseInt(value, base, 64)
+	if err != nil {
+		return defaultValue, fmt.Errorf("failed to parse %s: %w", name, err)
+	}
+
+	return intValue, nil
+}
+
+// GetInt64Input gets an int64 input value from environment variables.
+// If the input is empty or not a valid integer, it returns the default value.
+// If the input is not a valid integer, it sets a failure message.
+func GetInt64Input(name string, defaultValue int64) int64 {
+	intValue, err := getIntInput(name, defaultValue, 10)
+	if err != nil {
+		SetFailed(err.Error())
+		return defaultValue
+	}
+	return intValue
+}
+
+// GetIntInput gets an int input value from environment variables.
+// If the input is empty or not a valid integer, it returns the default value.
+// If the input is not a valid integer, it sets a failure message.
+func GetIntInput(name string, defaultValue int) int {
+	intValue, err := getIntInput(name, int64(defaultValue), 10)
+	if err != nil {
+		SetFailed(err.Error())
+		return defaultValue
+	}
+	return int(intValue)
+}
+
+// GetInt64InputOpt gets an int64 input value from environment variables.
+// It returns nil if the input is empty.
+// If the input is not a valid integer, it sets a failure message.
+func GetInt64InputOpt(name string) *int64 {
+	value := GetInput(name)
+	if value == "" {
+		return nil
+	}
+
+	intValue, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		SetFailed(fmt.Sprintf("failed to parse %s: %v", name, err))
+		return nil
+	}
+	return &intValue
 }
 
 // SetOutput sets an output value.

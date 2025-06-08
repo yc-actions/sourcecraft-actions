@@ -8,8 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/serverless/functions/v1"
@@ -60,57 +58,6 @@ const (
 	inputYcSaJsonCredentials = "YC_SA_JSON_CREDENTIALS"
 	inputYcIamToken          = "YC_IAM_TOKEN"
 )
-
-// Secret represents a Lockbox secret.
-type Secret struct {
-	EnvironmentVariable string
-	ID                  string
-	VersionID           string
-	Key                 string
-}
-
-// parseLockboxVariables parses Lockbox variables from a string slice.
-func parseLockboxVariables(secrets []string) []Secret {
-	sourcecraft.Info(fmt.Sprintf("Secrets string: %q", secrets))
-
-	var secretsArr []Secret
-
-	for _, line := range secrets {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", line))
-
-			continue
-		}
-
-		environmentVariable := parts[0]
-
-		values := strings.Split(parts[1], "/")
-		if len(values) != 3 {
-			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", line))
-
-			continue
-		}
-
-		id, versionID, key := values[0], values[1], values[2]
-		if environmentVariable == "" || id == "" || versionID == "" || key == "" {
-			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", line))
-
-			continue
-		}
-
-		secretsArr = append(secretsArr, Secret{
-			EnvironmentVariable: environmentVariable,
-			ID:                  id,
-			VersionID:           versionID,
-			Key:                 key,
-		})
-	}
-
-	sourcecraft.Info(fmt.Sprintf("SecretsObject: %q", secretsArr))
-
-	return secretsArr
-}
 
 // parseIgnoreGlobPatterns parses ignore glob patterns from a string slice.
 func parseIgnoreGlobPatterns(patterns []string) []string {
@@ -424,10 +371,10 @@ func createFunctionVersion(
 	}
 
 	// Set up secrets
-	secrets := parseLockboxVariables(inputs.Secrets)
+	secrets := env.ParseSecrets(inputs.Secrets)
 	for _, secret := range secrets {
 		request.Secrets = append(request.Secrets, &functions.Secret{
-			Id:        secret.ID,
+			Id:        secret.SecretID,
 			VersionId: secret.VersionID,
 			Key:       secret.Key,
 			Reference: &functions.Secret_EnvironmentVariable{
@@ -564,17 +511,7 @@ func main() {
 	}
 
 	// Parse execution timeout
-	executionTimeoutStr := sourcecraft.GetInput(inputExecutionTimeout)
-	if executionTimeoutStr == "" {
-		executionTimeoutStr = "5"
-	}
-
-	executionTimeout, err := strconv.Atoi(executionTimeoutStr)
-	if err != nil {
-		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse execution timeout: %v", err))
-
-		return
-	}
+	executionTimeout := sourcecraft.GetIntInput(inputExecutionTimeout, 5)
 
 	// Parse log level
 	logLevelStr := sourcecraft.GetInput(inputLogLevel)
@@ -587,17 +524,7 @@ func main() {
 	}
 
 	// Parse async retries count
-	asyncRetriesCountStr := sourcecraft.GetInput(inputAsyncRetriesCount)
-	if asyncRetriesCountStr == "" {
-		asyncRetriesCountStr = "3"
-	}
-
-	asyncRetriesCount, err := strconv.Atoi(asyncRetriesCountStr)
-	if err != nil {
-		sourcecraft.SetFailed(fmt.Sprintf("Failed to parse async retries count: %v", err))
-
-		return
-	}
+	asyncRetriesCount := sourcecraft.GetIntInput(inputAsyncRetriesCount, 3)
 
 	// Create inputs
 	inputs := &function.ActionInputs{

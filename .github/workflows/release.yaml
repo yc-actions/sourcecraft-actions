@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app_name: [function, coi, obj-storage-upload, apigw]
+        app_name: [function, coi, obj-storage-upload, apigw, container]
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
       contents: read

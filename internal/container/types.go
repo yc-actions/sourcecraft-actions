@@ -1,36 +1,18 @@
-package env
+package container
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/yc-actions/sourcecraft-actions/pkg/sourcecraft"
+	"github.com/yandex-cloud/go-genproto/yandex/cloud/logging/v1"
 )
 
-// Secret represents a Lockbox secret.
+// Secret represents a secret for a container
 type Secret struct {
 	EnvironmentVariable string
 	SecretID            string
 	VersionID           string
 	Key                 string
-}
-
-// ParseEnvironmentVariables parses environment variables from a string slice.
-func ParseEnvironmentVariables(env []string) map[string]string {
-	sourcecraft.Info(fmt.Sprintf("Environment string: %q", env))
-
-	environment := make(map[string]string)
-
-	for _, line := range env {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			environment[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-	}
-
-	sourcecraft.Info(fmt.Sprintf("EnvObject: %q", environment))
-
-	return environment
 }
 
 // ParseSecret parses a secret string in the format "ENV_VAR=secretID/versionID/key"
@@ -72,11 +54,13 @@ func ParseSecret(input string) (*Secret, error) {
 	}, nil
 }
 
-// ParseSecrets parses multiple secret strings and logs errors instead of returning them
-func ParseSecrets(inputs []string) []*Secret {
-	sourcecraft.Info(fmt.Sprintf("Secrets string: %q", inputs))
+// ParseSecrets parses multiple secret strings
+func ParseSecrets(inputs []string) ([]*Secret, error) {
+	if len(inputs) == 0 {
+		return nil, nil
+	}
 
-	var secrets []*Secret
+	secrets := make([]*Secret, 0, len(inputs))
 
 	for _, input := range inputs {
 		if input == "" {
@@ -85,14 +69,57 @@ func ParseSecrets(inputs []string) []*Secret {
 
 		secret, err := ParseSecret(input)
 		if err != nil {
-			sourcecraft.SetFailed(fmt.Sprintf("Broken reference to Lockbox Secret: %s", input))
-			continue
+			return nil, err
 		}
 
 		secrets = append(secrets, secret)
 	}
 
-	sourcecraft.Info(fmt.Sprintf("SecretsObject: %q", secrets))
+	return secrets, nil
+}
 
-	return secrets
+// ParseEnvironmentVariables parses environment variables in the format "KEY=VALUE"
+func ParseEnvironmentVariables(inputs []string) (map[string]string, error) {
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+
+	env := make(map[string]string)
+
+	for _, input := range inputs {
+		if input == "" {
+			continue
+		}
+
+		parts := strings.SplitN(input, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("environment variable has wrong format: %s", input)
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		if key == "" {
+			return nil, fmt.Errorf("environment variable has empty key: %s", input)
+		}
+
+		env[key] = value
+	}
+
+	return env, nil
+}
+
+// Container represents a serverless container
+type Container struct {
+	ID     string
+	RevID  string
+	Domain string
+}
+
+// LogOptions represents log options for a container
+type LogOptions struct {
+	Disabled   bool
+	LogGroupID string
+	FolderID   string
+	MinLevel   logging.LogLevel_Level
 }
