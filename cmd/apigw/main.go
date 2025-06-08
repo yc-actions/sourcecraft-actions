@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/serverless/apigateway/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
@@ -130,8 +131,8 @@ func main() {
 
 	if gatewaySpecFile != "" {
 		var err error
-
-		specContent, err = os.ReadFile(gatewaySpecFile)
+		fullPath := filepath.Join(sourcecraft.GetSourcecraftWorkspace(), gatewaySpecFile)
+		specContent, err = os.ReadFile(fullPath)
 		if err != nil {
 			sourcecraft.SetFailed(fmt.Sprintf("Failed to read spec file: %v", err))
 
